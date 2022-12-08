@@ -1,6 +1,6 @@
 #include <stdio.h>
 	
-/* Sum to variables & calculate the difference between them */
+
 void sum_difference(int *a, int *b) {
 	int tmp = *a;
 	*a = *a + *b;

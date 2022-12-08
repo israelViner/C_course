@@ -5,7 +5,7 @@
 void reverse(int Array[ARRAY_SIZE]);
 
 
-/* Simple insertion sort */    
+    
 void insertionSort(int array[ARRAY_SIZE]) {
         int j;
         int i;
@@ -23,17 +23,6 @@ void insertionSort(int array[ARRAY_SIZE]) {
         }
 }
 
-/* The main task: Reverse the array */
-void reverse(int Array[ARRAY_SIZE])
-{
-	int temp,i;
-	for (i=0; i < (ARRAY_SIZE/2) ; i++)
-	{
-		temp = Array[ARRAY_SIZE-1-i];
-		Array[ARRAY_SIZE-1-i] = Array[i];
-		Array[i] =temp;
-	}
-}
 
 
 int main()
@@ -64,4 +53,16 @@ int main()
 	
 	printf("\n************************\n");
 	return 0;
+}
+
+
+void reverse(int Array[ARRAY_SIZE])
+{
+	int temp,i;
+	for (i=0; i < (ARRAY_SIZE/2) ; i++)
+	{
+		temp = Array[ARRAY_SIZE-1-i];
+		Array[ARRAY_SIZE-1-i] = Array[i];
+		Array[i] =temp;
+	}
 }

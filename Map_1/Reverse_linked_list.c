@@ -3,13 +3,13 @@
 
 //#define 0 NULL
 
-/* Link list node */
+// Link list node
 struct Node {
 	int data;
 	struct Node* next;
 };
 
-/* Function to add a new node */
+// Function to add a new node
 void insert(struct Node** head_ref, int new_data)
 {
 	struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));	
@@ -18,7 +18,7 @@ void insert(struct Node** head_ref, int new_data)
 	(*head_ref) = new_node;
 }
 
-/* Function to print linked list */
+// Function to print linked list
 void printList(struct Node* head)
 {
 	struct Node* temp = head;
@@ -28,7 +28,7 @@ void printList(struct Node* head)
 	}
 }
 
-/* The main task: reverse the linked list */
+//The main task
 static void reverse(struct Node** head_ref)
 {
 	struct Node* temp = *head_ref;
@@ -43,7 +43,7 @@ static void reverse(struct Node** head_ref)
 
 int main()
 {
-	/* Start with the empty list */
+	// Start with the empty list
 	struct Node* head = NULL;
 	insert(&head, 20);
 	insert(&head, 4);
