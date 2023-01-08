@@ -4,24 +4,24 @@
 //#define 0 NULL
 
 // Link list node
-struct Node {
+struct Node_tree {
 	int data;
-	struct Node* next;
+	struct Node_tree* next;
 };
 
 // Function to add a new node
-void insert(struct Node** head_ref, int new_data)
+void insert(struct Node_tree** head_ref, int new_data)
 {
-	struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));	
+	struct Node_tree* new_node = (struct Node_tree*)malloc(sizeof(struct Node_tree));	
 	new_node->data = new_data;
 	new_node->next = (*head_ref);
 	(*head_ref) = new_node;
 }
 
 // Function to print linked list
-void printList(struct Node* head)
+void printList(struct Node_tree* head)
 {
-	struct Node* temp = head;
+	struct Node_tree* temp = head;
 	while (temp != NULL) {
 		printf("%d ", temp->data);
 		temp = temp->next;
@@ -29,9 +29,9 @@ void printList(struct Node* head)
 }
 
 //The main task
-static void reverse(struct Node** head_ref)
+static void reverse(struct Node_tree** head_ref)
 {
-	struct Node* temp = *head_ref;
+	struct Node_tree* temp = *head_ref;
 	(*head_ref) = NULL;
 	while (temp != NULL)
 	{
@@ -44,7 +44,7 @@ static void reverse(struct Node** head_ref)
 int main()
 {
 	// Start with the empty list
-	struct Node* head = NULL;
+	struct Node_tree* head = NULL;
 	insert(&head, 20);
 	insert(&head, 4);
 	insert(&head, 15);

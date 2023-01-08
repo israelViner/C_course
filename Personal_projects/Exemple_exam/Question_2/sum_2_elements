@@ -1,0 +1,16 @@
+
+
+
+void find_primes(int* arr, int n, int num, int *p1, int *p2) {
+	int head = 0;
+	int tail = n - 1;
+	while (*(arr + head) + *(arr + tail) != num) {
+		if (*(arr + head) + *(arr + tail) > num)
+			--tail;
+		else if (*(arr + head) + *(arr + tail) < num)
+			++head;
+	}
+	*p1 = *(arr + head);
+	*p2 = *(arr + tail);
+
+}

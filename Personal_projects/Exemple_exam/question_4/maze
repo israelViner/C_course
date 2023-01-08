@@ -1,0 +1,51 @@
+#define USED -1
+#define FREE 0
+#define M 6
+#define N 6
+
+
+struct tile {
+	int row;
+	int col;
+};
+
+int path(int maze[M][N], struct tile src, struct tile dst) {
+	if (in_bound(src) || used(maze, src)
+		return 0;
+	if (src.row == dst.row && src.col == dst.col)
+		return 1;
+	else {
+		maze[src.row][src.col] = USED;
+		struct tile t;
+		
+		src.row++;
+		if (path(maze, src, dst))
+			return 1;
+		src.row-=2;
+		if (path(maze, src, dst))
+			return 1;
+		src.row++;
+		src.col++;
+		if (path(maze, src, dst))
+			return 1;
+		src.col-=2;		
+		if (path(maze, src, dst))
+			return 1;
+		maze[src.row][src.col] = FREE;	
+		return 0;
+	}
+		
+
+}
+
+
+int in_bound(struct tile t) {
+    return t.col >= 0 && t.col < N && t.row >= 0 && t.row < M;
+}
+
+
+int used(int maze[M][N], struct tile t) {
+    return maze[t.row][t.col] == USED;
+}
+
+
