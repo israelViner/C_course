@@ -1,5 +1,4 @@
 #include "fs.h"
-#include "disk.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,12 +24,12 @@ int main( int argc, char *argv[] )
 	char image_prefix[] = "./Images/";
 	char *image_sufix = argv[1];
 	char* name = strcat(image_prefix, image_sufix);
-	if(!disk_init(name,atoi(argv[2]))) {
+	if(!fs_init(name,atoi(argv[2]))) {
 		printf("couldn't initialize %s: %s\n",name,strerror(errno));
 		return 1;
 	}
 
-	printf("opened emulated disk image %s with %d blocks\n",name,disk_size());
+	printf("opened emulated disk image %s with %d blocks\n",name,fs_size());
 
 	while(1) {
 		printf(" simplefs> ");
@@ -172,7 +171,7 @@ int main( int argc, char *argv[] )
 	}
 
 	printf("closing emulated disk.\n");
-	disk_close();
+	fs_close();
 
 	return 0;
 }

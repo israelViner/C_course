@@ -577,3 +577,30 @@ void color_bitmap(struct fs_inode inode, int color)
 		} while (indirect);
 	}
 }
+
+
+/* Init a file system in the disk */
+int fs_init( const char *filename, int n ) 
+{
+	if (!disk_init(filename, n)) {
+		return 0;
+	}
+	return 1;
+}
+
+
+/* Get the size of the disk */
+int fs_size()
+{
+	return disk_size();
+}
+
+
+/* Close the disk */
+void fs_close()
+{
+	free(bitmap);
+	disk_close();
+}
+
+

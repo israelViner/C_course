@@ -38,6 +38,9 @@ int  fs_delete(int inumber);
 int  fs_getsize(int inumber);
 int  fs_read( int inumber, char *data, int length, int offset );
 int  fs_write( int inumber, const char *data, int length, int offset );
+int fs_init( const char *filename, int n );
+int fs_size();
+void fs_close();
 
 /* Auxiliary functions */
 int inode_load(int inumber, struct fs_inode *inode);
