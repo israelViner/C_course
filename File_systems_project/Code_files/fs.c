@@ -24,11 +24,12 @@ int fs_format()
 		return 0;
 	}
 
-	union fs_block block, temp_block;
+	union fs_block block;
 	disk_read(0,block.data);
 	int blocks_inodes = block.super.ninodeblocks;
 	
 	/* If the disk is exsists but not mounted - clear the disk */
+	union fs_block temp_block;
 	if (block.super.magic == FS_MAGIC) {
 		for (int i = 1; i <= blocks_inodes; ++i) {
 			disk_read(i,temp_block.data);
@@ -69,15 +70,37 @@ int fs_format()
 /* Scan a mounted filesystem and report on how the inodes and blocks are organized */
 void fs_debug()
 {
+	if(!bitmap) {
+		printf("\n\033[1;31mERROR: The disk isn't mounted\n\n\033[0m");
+		return;
+	}	
+	
 	union fs_block block;
-
 	disk_read(0,block.data);
 
 	/* Print the superblock details */
-	printf("\033[1;31msuperblock:\n\033[0m");
+	printf("\n\033[1;31msuperblock:\n\033[0m");
 	printf("    %d \033[1;31mblocks\n\033[0m",block.super.nblocks);
 	printf("    %d \033[1;31minode blocks\n\033[0m",block.super.ninodeblocks);
 	printf("    %d \033[1;31minodes\n\033[0m",block.super.ninodes);
+
+	/* Print the valid indexes in the bitmap (that is, the occupied blocks in the disk) */
+	int system_files = block.super.ninodeblocks;
+	int data_files = 0;
+	printf("\n\033[1;34mThe occupied blocks are: \033[0m");
+	for (int j = block.super.ninodeblocks + 1; j < block.super.nblocks; ++j)
+		if (bitmap[j]) {
+			++data_files;
+			printf("%d, ", j);
+		}
+	printf("\n");
+	
+	/* Print the snupshot of the system (the amount of the free/used memory ) */
+	printf("\n\033[1;31mSnupshot:\n\033[0m");
+	printf("    \033[1;31mMemory in use: \033[0m %d from %d blocks\n", system_files + data_files ,block.super.nblocks);
+	printf("    \033[1;31mSystem files: \033[0m %d blocks\n", system_files);
+	printf("    \033[1;31mFree memory: \033[0m %d blocks\n\n",block.super.nblocks - (system_files + data_files));
+
 	
 	/* Print the valid inodes details */
 	union fs_block block_1;	
@@ -90,17 +113,6 @@ void fs_debug()
 			}
 		}
 	}
-
-	/* Print the valid indexes in the bitmap (that is, the occupied blocks in the disk) */
-	if(!bitmap) {
-		printf("\n\033[1;31mERROR: The disk isn't mounted\n\n\033[0m");
-		return;
-	}
-	printf("\nThe occupied blocks are:\n");
-	for (int j = 1; j < block.super.nblocks; ++j)
-		if (bitmap[j])
-			printf("\033[1;36mblock\033[0m %d, ", j);
-	printf("\n");		
 }
 
 
@@ -115,64 +127,26 @@ int fs_mount()
 	}
 
 	/* Initialize an empty bitmap in the size of blocks of the disk */
-	union fs_block block, temp_block;
+	union fs_block block;
 	disk_read(0,block.data);
-	int size = block.super.nblocks;
-	int n_inodes = block.super.ninodeblocks;
-	bitmap = (int *)calloc(size, sizeof(int));
+	int size_disk = block.super.nblocks;
+	int n_blocks_inodes = block.super.ninodeblocks;
+	bitmap = (int *)calloc(size_disk, sizeof(int));
 	
-	/* Fill the bitmap in the occupied blocks indexses */
-	for (int i = 1; i <= n_inodes; ++i) {
+	/* Fill the bitmap in the occupied blocks indexses */	
+	union fs_block temp_block;
+	for (int i = 1; i <= n_blocks_inodes; ++i) {
 		disk_read(i,temp_block.data);
 		for (int j = 0; j < INODES_PER_BLOCK; ++j) {
 			if (temp_block.inode[j].isvalid) {
 				if (temp_block.inode[j].size > 0) {
-					int b = 0;
-					for (; b < POINTERS_PER_INODE; ++b) {
-						if (temp_block.inode[j].direct[b])
-							bitmap[temp_block.inode[j].direct[b]] = 1;
-						else 
-							break;
-					}
-					if (temp_block.inode[j].indirect) {
-						bitmap[temp_block.inode[j].indirect] = 1;
-						union fs_block inblock;
-						int indirect = temp_block.inode[j].indirect;
-						do {
-							disk_read(indirect, inblock.data);
-							for (b = 0; b < POINTERS_PER_BLOCK; ++b) {
-								if (inblock.pointers[b])
-									bitmap[inblock.pointers[b]] = 1;
-								else 
-									break;
-							}
-							indirect = inblock.pointers[POINTERS_PER_BLOCK - 1];
-						} while (indirect);
-					}
+					color_bitmap(temp_block.inode[j], 1);
 				}
 			}
 		}
 	}
 	return 1;
 }				
-				
-				
-				/*int c = 0;
-				if ((a.inode[j].size/DISK_BLOCK_SIZE) + 1 < 6) {
-					while (c < a.inode[j].size/DISK_BLOCK_SIZE + 1) {
-						printf("diract c: %d\n", a.inode[j].direct[c]);
-						bitmap[a.inode[j].direct[c++]] = 1;
-					}
-				}
-				else {
-					while (c < POINTERS_PER_INODE) 
-						bitmap[a.inode[j].direct[c++]] = 1;
-					disk_read(a.inode[j].indirect,block.data);
-					while (c < a.inode[j].size/DISK_BLOCK_SIZE) {
-						bitmap[block.pointers[c-POINTERS_PER_INODE]] = 1;
-						++c;
-					}
-				}*/
 
 
 /* Create a new inode of zero length. On success, return the inumber. On failure, return negative one. */
@@ -180,18 +154,19 @@ int fs_create()
 {
 	union fs_block block;
 	disk_read(0, block.data);
-	int ninodes = block.super.ninodeblocks;
+	int n_blocks_inodes = block.super.ninodeblocks;
 
 	/* Create an inode and fill his fields */
 	struct fs_inode inode;
 	inode.isvalid = 1;
 	inode.size = 0;
 	inode.indirect = 0;
-	for (int i = 0; i < POINTERS_PER_INODE; ++i)
+	for (int i = 0; i < POINTERS_PER_INODE; ++i) {
 		inode.direct[i] = 0;
+	}
 
 	/* Find free place in the inodes table and insert the new inode into it */
-	for (int i = 1; i <= ninodes; ++i) {
+	for (int i = 1; i <= n_blocks_inodes; ++i) {
 		disk_read(i,block.data);
 		for (int j = 0; j < INODES_PER_BLOCK; ++j) {
 			if (!block.inode[j].isvalid) {
@@ -212,35 +187,31 @@ int fs_create()
  and return them to the free block map. */
 int fs_delete( int inumber )
 {
-	int n = inumber/INODES_PER_BLOCK+1, j = inumber%INODES_PER_BLOCK;
-	union fs_block block, temp_block;
-	disk_read(n,block.data);
-	
-	/* If the inode isn't exsist - return error */
-	if (!block.inode[j].isvalid) {	
+	/* If the inode isn't exsists in the inodes table - return error */
+	struct fs_inode inode;
+	if (!inode_load(inumber, &inode)) {
 		printf("\n\033[1;31mERROR: This inode isn't exsists\n\n\033[0m");
 		return 0;
 	}
 
+	int n_block = inumber/INODES_PER_BLOCK+1, i_inode = inumber%INODES_PER_BLOCK;
+	union fs_block block;
+	disk_read(n_block,block.data);
+
+	/* If the inode isn't created - return error */
+	if (!block.inode[i_inode].isvalid) {	
+		printf("\n\033[1;31mERROR: This inode isn't created\n\n\033[0m");
+		return 0;
+	}
+
 	/* Free the place in the inode table */
-	block.inode[j].isvalid = 0;
-	disk_write(n, block.data);
+	block.inode[i_inode].isvalid = 0;
+	disk_write(n_block, block.data);
 	
 	/* Free the connected indices in the bitmap (including the inderctives) */
-	int i = 0, size = block.inode[j].size/DISK_BLOCK_SIZE + 1;
-	if (block.inode[j].indirect)
-		disk_read(block.inode[j].indirect,temp_block.data);
-	while (i < size) 
-		if (i < POINTERS_PER_INODE)
-			bitmap[block.inode[j].direct[i++]] = 0;
-		else {
-			if((i - POINTERS_PER_INODE)%(POINTERS_PER_BLOCK - 1) == 0) {
-				disk_read(temp_block.pointers[(i - POINTERS_PER_BLOCK)%(POINTERS_PER_BLOCK - 1)],temp_block.data);
-				bitmap[temp_block.pointers[(i - POINTERS_PER_BLOCK)%(POINTERS_PER_BLOCK - 1)]] = 0; 
-			}
-			bitmap[temp_block.pointers[(i - POINTERS_PER_INODE)%(POINTERS_PER_BLOCK - 1)]] = 0;
-			++i;
-		}
+	if (block.inode[i_inode].size > 0) {
+		color_bitmap(block.inode[i_inode], 0);		
+	}
 	return 1;
 }
 
@@ -248,15 +219,25 @@ int fs_delete( int inumber )
 /* Return the logical size of the given inode, in bytes. */
 int fs_getsize( int inumber )
 {
-	int n = inumber/INODES_PER_BLOCK+1, j = inumber%INODES_PER_BLOCK;
+	int n_block = inumber / INODES_PER_BLOCK + 1;
+	int inode_ptr = inumber % INODES_PER_BLOCK;
 	union fs_block block;
-	disk_read(n,block.data);
-	if (block.inode[j].isvalid)	
-		return block.inode[j].size;
+	disk_read(n_block, block.data);
+
+	/* If the inode isn't exsists in the inodes table - return error */
+	struct fs_inode inode;
+	if (!inode_load(inumber, &inode)) {
+		printf("\n\033[1;31mERROR: This inode isn't exsists\n\n\033[0m");
+		return -1;
+	}
+
+	/* If the inode isn't created - return error */
+	if (!(block.inode[inode_ptr].isvalid)) {
+		printf("\n\033[1;31mERROR: This inode isn't created\n\n\033[0m");
+		return -1;
+	}
 	
-	/* If the inode isn't exsist - return error */
-	printf("\n\033[1;31mERROR: This inode isn't exsists\n\n\033[0m");
-	return -1;
+	return block.inode[inode_ptr].size;	
 }
 
 
@@ -267,34 +248,41 @@ int fs_read( int inumber, char *data, int length, int offset )
 {
 	union fs_block block;
 	struct fs_inode inode;
-	inode_load(inumber, &inode);
+	
+	/* If the inode isn't exsists in the inodes table - return error */
+	if (!inode_load(inumber, &inode)) {
+		printf("\n\033[1;31mERROR: This inode isn't exsists\n\n\033[0m");
+		return 0;
+	}
 		
 	/* If the inode isn't exsist - return error */
 	if (!inode.isvalid) {	
 		printf("\n\033[1;31mERROR: This inode isn't exsists\n\n\033[0m");
 		return 0;
 	}
-
-	int n = offset/DISK_BLOCK_SIZE, j = offset%DISK_BLOCK_SIZE, len = length, edge = 0;
 	
 	/* Check the anount of the characters that available to copy */
+	int len = length; 
 	if (inode.size <= length + offset)
 		len = inode.size - offset;
 	
 	/* Read all the data starting from point j in block n (the variable j is resets after the first loop) */
-	int left = len, i = n;
-	
+	int i = offset / DISK_BLOCK_SIZE;
+	int start_byte = offset % DISK_BLOCK_SIZE;
+	int left = len;
+	int edge = 0;
 	while (left > 0) {
 		
 		/* Provide the spesific wanted block in order to write the data from it */
 		provide_block(inode, &block, i++);
 		
 		/* Read into the the string the data from the block */
-		for (int index = j; index < DISK_BLOCK_SIZE && index < left + j; ++index) 
-			data[edge + index - j] = block.data[index];
-		edge += DISK_BLOCK_SIZE - j;
-		left -= (DISK_BLOCK_SIZE - j);
-		j = 0;
+		for (int index = start_byte; index < DISK_BLOCK_SIZE && index < left + start_byte; ++index) {
+			data[edge + index - start_byte] = block.data[index];
+		}
+		edge += DISK_BLOCK_SIZE - start_byte;
+		left -= (DISK_BLOCK_SIZE - start_byte);
+		start_byte = 0;
 
 	}
 	return len;
@@ -315,7 +303,12 @@ int fs_write( int inumber, const char *data, int length, int offset )
 	
 	union fs_block block;
 	struct fs_inode inode;	
-	inode_load(inumber, &inode);
+	
+	/* If the inode isn't exsists in the inodes table - return error */
+	if (!inode_load(inumber, &inode)) {
+		printf("\n\033[1;31mERROR: This inode isn't exsists\n\n\033[0m");
+		return 0;
+	}
 
 	/* If the inode isn't exsist - return error */
 	if (!inode.isvalid) {	
@@ -323,11 +316,11 @@ int fs_write( int inumber, const char *data, int length, int offset )
 		return 0;
 	}
 
-	int n = offset/DISK_BLOCK_SIZE, j = offset%DISK_BLOCK_SIZE;
-	int left = length , edge = 0, new_block = -1, i = n, copied = 0;
-		
+
 	/* Write all the data into the inode 
 	starting from point j in block n */
+	int i = offset / DISK_BLOCK_SIZE, start_byte = offset % DISK_BLOCK_SIZE;
+	int left = length , edge = 0, new_block = -1, copied = 0;
 	while (left > 0) {
 		
 		/* Find a block to write into it (new one if a connected block isn't exsist) */
@@ -345,22 +338,23 @@ int fs_write( int inumber, const char *data, int length, int offset )
 		/* Read the block in order to write into it */
 		disk_read(new_block, block.data);
 		
-		int index = j;
+		int index = start_byte;
 		for (; index < DISK_BLOCK_SIZE && index < left; ++index) {
-			 block.data[index] = data[edge + index - j];
+			 block.data[index] = data[edge + index - start_byte];
 		}
 		disk_write(new_block, block.data);
 	
 		/* Update the variables */
-		copied += index - j;
-		edge += index - j;
-		left -= (index - j);		
-		j = 0;		
+		copied += index - start_byte;
+		edge += index - start_byte;
+		left -= (index - start_byte);		
+		start_byte = 0;		
 	}
 
 	/* Save the updated inode into the inode table */
-	if (offset + length > inode.size)
+	if (offset + length > inode.size) {
 		inode.size = offset + length;
+	}
 	inode_save(inumber, inode);
 	
 	return length;
@@ -385,31 +379,34 @@ int find_free_block()
 /* Find the connected block for a specific place in a inode.
 if there isn't connectet block - find free block and connected it into
 this place (if the disk is full return 0). */
-int find_block(int inumber, int i) 
+int find_block(int inumber, int inode_ptr) 
 {
 	struct fs_inode inode;
 	inode_load(inumber, &inode);
 	
 	/* If the inode isn't valit return 0 */
-	if (!inode.isvalid)
+	if (!inode.isvalid) {
 		return 0;
+	}
 	
 	/* If the block intented for the directives */
-	if (i < POINTERS_PER_INODE) {
+	if (inode_ptr < POINTERS_PER_INODE) {
 		
 		/* If a connected block is exsist - return it */
-		if (inode.direct[i] != 0) 
-			return inode.direct[i];
+		if (inode.direct[inode_ptr] != 0) {
+			return inode.direct[inode_ptr];
+		}
 		
 		/* If a connected block isn't exsist - connect new block to the inode and return it 
 		(return -1 if the disk is full) */
 		else {
 			int free_block = find_free_block();
-			if (free_block == -1)
+			if (free_block == -1) {
 				return -1;
+			}
 			else {
 				bitmap[free_block] = 1;
-				inode.direct[i] = free_block;
+				inode.direct[inode_ptr] = free_block;
 				inode_save(inumber, inode);	
 				return free_block;			
 			}
@@ -419,32 +416,35 @@ int find_block(int inumber, int i)
 	/* If the block intented for the indirectives */
 	else {
 		
-		i -= 5;
+		inode_ptr -= 5;
 		union fs_block inblock;
 		int indirect = inode.indirect, oldindirect = 0, *olddirect = &(inode.indirect);
 		
-		while (i > POINTERS_PER_BLOCK - 2) {
+		while (inode_ptr > POINTERS_PER_BLOCK - 2) {
 			disk_read(indirect, inblock.data);
 			oldindirect = indirect;
 			olddirect = &(inblock.pointers[POINTERS_PER_BLOCK - 1]);
 			indirect = inblock.pointers[POINTERS_PER_BLOCK - 1];
-			i -= POINTERS_PER_BLOCK - 1;
+			inode_ptr -= POINTERS_PER_BLOCK - 1;
 		}		
 		
 		/* Allocate new block for the indirect if necessary - including the following indirect blocks
 		(return -1 if the disk is full) */
 		if (indirect == 0) {
 			int free_block = find_free_block();
-			if (free_block == -1)
+			if (free_block == -1) {
 					return -1;	
+			}
 			bitmap[free_block] = 1;
 			union fs_block temp_block;
-			for (int i = 0; i < POINTERS_PER_BLOCK; ++i)
+			for (int i = 0; i < POINTERS_PER_BLOCK; ++i) {
 				temp_block.pointers[i] = 0;			
+			}
 			disk_write(free_block, temp_block.data);
 			*olddirect = free_block;
-			if(oldindirect)
+			if(oldindirect) {
 				disk_write(oldindirect, inblock.data);
+			}
 			indirect = free_block;
 			inode_save(inumber, inode);
 		}
@@ -452,15 +452,17 @@ int find_block(int inumber, int i)
 		disk_read(indirect, inblock.data);
 			
 		/* Check if a connected block is exsist and allocate now block if not */
-		if (inblock.pointers[i] != 0)
-			return inblock.pointers[i];
+		if (inblock.pointers[inode_ptr] != 0) {
+			return inblock.pointers[inode_ptr];
+		}
 		else {
 			int free_block1 = 0;
 			free_block1 = find_free_block();
-			if (free_block1 == -1)
+			if (free_block1 == -1) {
 				return -1;
+			}
 			bitmap[free_block1] = 1;
-			inblock.pointers[i] = free_block1;
+			inblock.pointers[inode_ptr] = free_block1;
 			disk_write(indirect, inblock.data);
 			return free_block1;
 		}
@@ -469,47 +471,50 @@ int find_block(int inumber, int i)
 
 
 /* Load an inode from the inodes table of the disk */
-void inode_load(int inumber, struct fs_inode *inode)
-{
-	int n = (inumber/INODES_PER_BLOCK)+1, j = inumber%INODES_PER_BLOCK;
+int inode_load(int inumber, struct fs_inode *inode)
+{	
+	int n_block = (inumber/INODES_PER_BLOCK) +1 , inode_ptr = inumber % INODES_PER_BLOCK;
 	union fs_block block;
-	disk_read(n,block.data);
-	*inode = block.inode[j];
+	disk_read(0,block.data);
+	if (inumber > block.super.ninodes - 1) 
+		return 0;
+	disk_read(n_block,block.data);
+	*inode = block.inode[inode_ptr];
+	return 1;
 }
 
 
 /* Save an inode into the inodes table of the disk */
 void inode_save(int inumber, struct fs_inode inode)
 {
-	int n = (inumber/INODES_PER_BLOCK)+1, j = inumber%INODES_PER_BLOCK;
+	int n_block = (inumber/INODES_PER_BLOCK) + 1, inode_ptr = inumber % INODES_PER_BLOCK;
 	union fs_block block;
-	disk_read(n, block.data);
-	block.inode[j] = inode;
-	disk_write(n,block.data);
+	disk_read(n_block, block.data);
+	block.inode[inode_ptr] = inode;
+	disk_write(n_block, block.data);
 }
 
 
 /* Provide the spesific wanted block in order to write the data from it */
-void provide_block(struct fs_inode inode, union fs_block *block, int i) 
+void provide_block(struct fs_inode inode, union fs_block *block, int block_ptr) 
 {
 	/* Read into block.data the data from the block that connected 
 	 to the directive or to the indirective of the inode */
-	
 	union fs_block indirect_block;
 	if (inode.indirect)
 		disk_read(inode.indirect ,indirect_block.data);
 	
 	/* If the block is connect to one of the directives */
-	if (i < POINTERS_PER_INODE)		
-		disk_read(inode.direct[i], block->data);
+	if (block_ptr < POINTERS_PER_INODE)		
+		disk_read(inode.direct[block_ptr], block->data);
 
 	/* If the block is connect to the first indirective */
-	else if (i < POINTERS_PER_INODE + POINTERS_PER_BLOCK - 1)
-		disk_read(indirect_block.pointers[i - 5] , block->data);		
+	else if (block_ptr < POINTERS_PER_INODE + POINTERS_PER_BLOCK - 1)
+		disk_read(indirect_block.pointers[block_ptr - 5] , block->data);		
 	
 	/* If the block is connect to one of the following indirectives */
 	else {
-		int temp_indirect = i - POINTERS_PER_INODE;
+		int temp_indirect = block_ptr - POINTERS_PER_INODE;
 		while (temp_indirect > 1022) {
 			disk_read(indirect_block.pointers[POINTERS_PER_BLOCK - 1], indirect_block.data);
 			temp_indirect = temp_indirect - POINTERS_PER_BLOCK - 1;
@@ -526,17 +531,49 @@ void print_inode(struct fs_inode inode)
 	union fs_block block;
 	printf("\033[1;32m\tsize\033[0m %d \033[1;32mbytes\n\033[0m", inode.size);
 	printf("\033[1;32m\tdirect blocks: \033[0m");
-	for (int c = 0; c < POINTERS_PER_INODE; ++c)
-	if(inode.direct[c])
-		printf("%d, ", inode.direct[c]);
+	for (int i = 0; i < POINTERS_PER_INODE; ++i) {
+		if(inode.direct[i]) {
+			printf("%d, ", inode.direct[i]);
+		}
+	}
 	printf("\033[1;32m\n\tindirect blocks: \033[0m%d\n", inode.indirect);
 	if (inode.indirect) {
 		printf("\033[1;32m\tindirect data blocks: \033[0m");
 		disk_read(inode.indirect ,block.data);
-		for (int c = 0; c < POINTERS_PER_BLOCK; ++c) {
-			if(block.pointers[c]) 
-				printf("%d, ", block.pointers[c]);
+		for (int i = 0; i < POINTERS_PER_BLOCK; ++i) {
+			if(block.pointers[i]) {
+				printf("%d, ", block.pointers[i]);
+			}
 		}
 	}
 	printf("\n");
+}
+
+
+/* Color all the connected blocks of a specific inode in 'color' 0/1 */
+void color_bitmap(struct fs_inode inode, int color) 
+{
+	int i_pointer = 0;
+	for (; i_pointer < POINTERS_PER_INODE; ++i_pointer) {
+		if (inode.direct[i_pointer])
+			bitmap[inode.direct[i_pointer]] = color;
+		else 
+			break;
+	}
+
+	if (inode.indirect) {
+		bitmap[inode.indirect] = color;
+		union fs_block inblock;
+		int indirect = inode.indirect;
+		do {
+			disk_read(indirect, inblock.data);
+			for (i_pointer = 0; i_pointer < POINTERS_PER_BLOCK; ++i_pointer) {
+				if (inblock.pointers[i_pointer])
+					bitmap[inblock.pointers[i_pointer]] = color;
+				else 
+					break;
+			}
+			indirect = inblock.pointers[POINTERS_PER_BLOCK - 1];
+		} while (indirect);
+	}
 }

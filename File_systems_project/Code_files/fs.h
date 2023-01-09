@@ -40,11 +40,12 @@ int  fs_read( int inumber, char *data, int length, int offset );
 int  fs_write( int inumber, const char *data, int length, int offset );
 
 /* Auxiliary functions */
-void inode_load(int inumber, struct fs_inode *inode);
+int inode_load(int inumber, struct fs_inode *inode);
 void inode_save(int inumber, struct fs_inode inode);
 void print_inode(struct fs_inode inode);
 int find_free_block();
-int find_block(int inumber, int i);
-void provide_block(struct fs_inode inode, union fs_block *block, int i);
+int find_block(int inumber, int inode_ptr);
+void provide_block(struct fs_inode inode, union fs_block *block, int block_ptr);
+void color_bitmap(struct fs_inode inode, int color);
 
 #endif
