@@ -108,7 +108,7 @@ void fs_debug()
 		disk_read(i,block_1.data);
 		for (int j = 0; j < INODES_PER_BLOCK; ++j) {
 			if (block_1.inode[j].isvalid) {
-				printf("\033[1;34minode\033[0m %d \n", j);
+				printf("\033[1;34minode\033[0m %d \n", (i-1) * INODES_PER_BLOCK + j);
 				print_inode(block_1.inode[j]);
 			}
 		}
@@ -262,9 +262,8 @@ int fs_read( int inumber, char *data, int length, int offset )
 	}
 	
 	/* Check the anount of the characters that available to copy */
-	int len = length; 
-	if (inode.size <= length + offset)
-		len = inode.size - offset;
+	int len = (inode.size > length + offset) ? length : inode.size - offset; 
+
 	
 	/* Read all the data starting from point j in block n (the variable j is resets after the first loop) */
 	int i = offset / DISK_BLOCK_SIZE;
@@ -495,7 +494,7 @@ void inode_save(int inumber, struct fs_inode inode)
 }
 
 
-/* Provide the spesific wanted block in order to write the data from it */
+/* Provide the spesific wanted block in order to read the data from it */
 void provide_block(struct fs_inode inode, union fs_block *block, int block_ptr) 
 {
 	/* Read into block.data the data from the block that connected 

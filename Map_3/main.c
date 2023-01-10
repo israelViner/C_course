@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <limits.h>
-#include "Question_1/question_1_stack.h"
-#include "Question_1/question_1_linked_list.h"
-#include "Question_2/calculator.h"
-#include "Question_3/binary_tree.h"
-#include "Question_4/hash.h"
-#include "Question_5/two_way_l_list.h"
-#include "Question_6/arrays.h"
+#include "Question_1__stack_based_on_linked_list_or_array/question_1_stack.h"
+#include "Question_1__stack_based_on_linked_list_or_array/question_1_linked_list.h"
+#include "Question_2___calculator/calculator.h"
+#include "Question_3__binary_tree/binary_tree.h"
+#include "Question_4__hash_table/hash.h"
+#include "Question_5__two_way_linked_list/two_way_l_list.h"
+#include "Question_6__maximum_product_&_divided_element_in_an_array/arrays.h"
 
 
 int main(int argc, char* argv[]) {
